@@ -2,12 +2,14 @@ import 'Origo';
 import GroupIndication from './legendenhancer/groupindication'
 import StyleSetter from './legendenhancer/styleSetter'
 import AbstractSetter from './legendenhancer/abstractSetter'
+import ChangeRemoveButtonStyle from './legendenhancer/changeRemoveButtonStyle'
 
 const Legendenhancer = function Legendenhancer(options = {}) {
   let {
     groupIndication,
     abstractSetter,
-    styleSetter
+    styleSetter,
+    changeremovebuttonstyle
   } = options;
   let allDivTagElements;
 
@@ -35,6 +37,7 @@ const Legendenhancer = function Legendenhancer(options = {}) {
       if (groupIndication) this.addComponent(GroupIndication({ viewer, layerOvs, ...groupIndication }));
       if (abstractSetter) this.addComponent(AbstractSetter({ viewer, layerOvs, ...abstractSetter }));
       if (styleSetter) this.addComponent(StyleSetter({ viewer, layerOvs, ...styleSetter }));
+      if (changeremovebuttonstyle) this.addComponent(ChangeRemoveButtonStyle({ viewer, layerOvs, allDivTagElements, ...changeremovebuttonstyle })); 
     }
   });
 }
