@@ -9,6 +9,7 @@ const StyleSetter = function StyleSetter(options = {}) {
   } = options;
 
   const name = 'stylesetter';
+  const layerOverlays = {};
   let secondarySlideNavEl;
 
   function getLegendGraphicUrl(layer, format, useDpi) {
@@ -46,19 +47,19 @@ const StyleSetter = function StyleSetter(options = {}) {
 
   // Sets the icons on overlays and adds event to replace the secondary icon on click
   function setLegendGraphicStyles() {
-    Object.keys(layerOvs).forEach(key => {
-      const layer = layerOvs[key].layer;
+    Object.keys(layerOverlays).forEach(key => {
+      const layer = layerOverlays[key].layer;
       checkIfTheme(layer).then(isTrue => {
         const legendUrl = isTrue ? getLegendGraphicUrl(layer, 'image/png') : getLegendGraphicUrl(layer, 'image/png', true);
         // Do not replace default icon when it is a theme layer
         if (!isTrue) {
-          const iconSpan = layerOvs[key].overlay.firstElementChild.getElementsByClassName('icon')[0];
+          const iconSpan = layerOverlays[key].overlay.firstElementChild.getElementsByClassName('icon')[0];
           const iconHtml = `<img class="cover" src="${legendUrl}" style="">`;
           iconSpan.innerHTML = iconHtml;
         }
 
         // Adds event to set the secondary image when clicking a layer in legend
-        layerOvs[key].overlay.addEventListener('click', () => {
+        layerOverlays[key].overlay.addEventListener('click', () => {
           const secondarySlideNavImageEl = secondarySlideNavEl.getElementsByTagName('li')[0];
           if (secondarySlideNavImageEl) secondarySlideNavImageEl.parentElement.innerHTML = secondarySlideHtmlString(isTrue, legendUrl);
         });
@@ -85,7 +86,7 @@ const StyleSetter = function StyleSetter(options = {}) {
     name,
     onAdd() {
       Object.keys(layerOvs).forEach(key => {
-        if (!layerConditions(layerOvs[key].layer)) delete layerOvs[key];
+        if (layerConditions(layerOvs[key].layer)) layerOverlays[key] = layerOvs[key];
       });
       secondarySlideNavEl = document.getElementsByClassName('secondary')[0];
       if (!secondarySlideNavEl) { console.error(`StyleSetter: secondarySlideNavEl was ${secondarySlideNavEl}`); }
