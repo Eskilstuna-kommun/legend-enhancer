@@ -24,7 +24,7 @@ The plugin can be loaded like this in an html-file:
                     abstractSetter : {
                         url : 'URL'
                     },
-                    changeremovebuttonstyle{
+                    changeremovebuttonstyle : {
                     }
                 });
                 viewer.addComponent(legendenhancer);
