@@ -59,10 +59,12 @@ const AbstractSetter = function AbstractSetter(options = {}) {
   return Origo.ui.Component({
     name,
     onAdd(e) {
-      let abstracts = {}
-
+      let layers = []
       Object.keys(layerOvs).forEach(key => {
-        if (layerConditions(layerOvs[key].layer)) layerNameList.push(key);
+        if (layerConditions(layerOvs[key].layer)) {
+          layers.push(layerOvs[key].layer);
+          layerNameList.push(key);
+        }
       });
 
       fetch(url, {
