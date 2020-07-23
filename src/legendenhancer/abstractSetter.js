@@ -5,14 +5,14 @@ const AbstractSetter = function AbstractSetter(options = {}) {
     viewer,
     layerOvs,
     url,
-    layerList = []
+    layerNameList = []
   } = options;
 
   function buildFilter() {
     let filter = '<ogc:Filter>';
-    let blobRequest = (layerList.length > 1);
+    let blobRequest = (layerNameList.length > 1);
     if (blobRequest) filter += '<ogc:Or>'
-    layerList.forEach(layerTitle => {
+    layerNameList.forEach(layerTitle => {
       filter += `<ogc:PropertyIsEqualTo matchCase="false">
                   <ogc:PropertyName>any</ogc:PropertyName>
                   <ogc:Literal>${layerTitle}</ogc:Literal>
@@ -60,10 +60,9 @@ const AbstractSetter = function AbstractSetter(options = {}) {
     name,
     onAdd(e) {
       let abstracts = {}
-      let layers = viewer.getLayers();
-      layers = layers.filter((layer) => layerConditions(layer));
-      layers.forEach(layer => {
-        layerList.push(layer.get('name'));
+
+      Object.keys(layerOvs).forEach(key => {
+        if (layerConditions(layerOvs[key].layer)) layerNameList.push(key);
       });
 
       fetch(url, {
@@ -76,37 +75,26 @@ const AbstractSetter = function AbstractSetter(options = {}) {
           let xml = new DOMParser().parseFromString(rsptext, "text/xml");
           let records = xml.getElementsByTagName("csw:Record");
 
-          //retrieve abstract from each matching record 
+          //retrieve abstract from each matching record and put them into DOM
           Array.from(records).forEach(record => {
             let uris = record.getElementsByTagName("dc:URI");
             if (uris) {
               Array.from(uris).forEach(uri => {
                 let layer = layers.find(x => x.get('name') == uri.getAttribute('name'));
                 if (layer) {
-                  let abstract = record.getElementsByTagName('dct:abstract')[0].textContent;
-                  abstracts[layer.get('title')] = abstract;
+                  layerOvs[layer.get('name')].overlay.addEventListener('click', () => {
+                    let secondarySlideNavEl = document.getElementsByClassName('secondary')[0];
+                    if (secondarySlideNavEl != null) {
+                      let targetElement = secondarySlideNavEl.firstElementChild.lastElementChild.lastElementChild;
+                      if (targetElement) targetElement.innerHTML = record.getElementsByTagName('dct:abstract')[0].textContent;
+                    }
+                  });
                 }
-              })
+              });
             }
-          })
-
-          let allDivTagElements = document.getElementsByTagName(`div`);
-          let El;
-          for (let i = 0; i < allDivTagElements.length; i++) {
-            const item = allDivTagElements[i];
-            if (Object.keys(abstracts).find((key) => key == item.textContent)) {
-              El = item.parentElement;
-              El.addEventListener('click', () => {
-                let secondarySlideNavEl = document.getElementsByClassName('secondary')[0];
-                if (secondarySlideNavEl != null) {
-                  let targetElement = secondarySlideNavEl.firstElementChild.lastElementChild.lastElementChild;
-                  if (targetElement) targetElement.innerHTML = abstracts[item.textContent];
-                }
-              })
-            }
-          }
+          });
         });
     }
   });
 }
-export default AbstractSetter;
+  export default AbstractSetter;
