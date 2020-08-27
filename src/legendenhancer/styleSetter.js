@@ -12,6 +12,7 @@ const StyleSetter = function StyleSetter(options = {}) {
   const layerOverlays = {};
   let secondarySlideNavEl;
 
+  //should be okay with ArcGIS WMS layers as is, provided useDpi is never true
   function getLegendGraphicUrl(layer, format, useDpi) {
     const source = layer.get('source');
     const url = source.getUrls()[0];
@@ -21,6 +22,7 @@ const StyleSetter = function StyleSetter(options = {}) {
     return legendUrl;
   }
 
+  //should never handle ArcGIS WMS layers
   function checkIfTheme(layer) {
     const url = getLegendGraphicUrl(layer, 'application/json');
     return fetch(url)
@@ -46,13 +48,17 @@ const StyleSetter = function StyleSetter(options = {}) {
   }
 
   // Sets the icons on overlays and adds event to replace the secondary icon on click
+  // if Arcgis then don't checkIfTheme
+  // but merely check if "theme"
   function setLegendGraphicStyles() {
     Object.keys(layerOverlays).forEach(key => {
       const layer = layerOverlays[key].layer;
-      checkIfTheme(layer).then(isTrue => {
-        const legendUrl = isTrue ? getLegendGraphicUrl(layer, 'image/png') : getLegendGraphicUrl(layer, 'image/png', true);
-        // Do not replace default icon when it is a theme layer
-        if (!isTrue) {
+
+      // A separate case is needed for ArcGIS WMS layers since there is no application/json legendGraphic
+      if (layer.get('ArcGIS') == true) {
+        const legendUrl = getLegendGraphicUrl(layer, 'image/png');
+
+        if (!layer.get('theme')) { 
           const iconSpan = layerOverlays[key].overlay.firstElementChild.getElementsByClassName('icon')[0];
           const iconHtml = `<img class="cover" src="${legendUrl}" style="">`;
           iconSpan.innerHTML = iconHtml;
@@ -61,18 +67,40 @@ const StyleSetter = function StyleSetter(options = {}) {
         // Adds event to set the secondary image when clicking a layer in legend
         layerOverlays[key].overlay.addEventListener('click', () => {
           const secondarySlideNavImageEl = secondarySlideNavEl.getElementsByTagName('li')[0];
-          if (secondarySlideNavImageEl) secondarySlideNavImageEl.parentElement.innerHTML = secondarySlideHtmlString(isTrue, legendUrl);
+          if (secondarySlideNavImageEl) secondarySlideNavImageEl.parentElement.innerHTML = secondarySlideHtmlString(Boolean(layer.get('theme')), legendUrl);
         });
 
         /* Adds the style to the map and updates the layer's style.
         This might be necessary for future references, layermanager etc. */
         viewer.addStyle(legendUrl, {
           icon: { src: legendUrl },
+          extendedLegend: Boolean(layer.get('theme'))
+        });
+        layer.set('style', legendUrl);
+
+      } else {
+        checkIfTheme(layer).then(isTrue => {
+        const legendUrl = isTrue ? getLegendGraphicUrl(layer, 'image/png') : getLegendGraphicUrl(layer, 'image/png', true);
+
+        if (!isTrue) {
+          const iconSpan = layerOverlays[key].overlay.firstElementChild.getElementsByClassName('icon')[0];
+          const iconHtml = `<img class="cover" src="${legendUrl}" style="">`;
+          iconSpan.innerHTML = iconHtml;
+        }
+
+        layerOverlays[key].overlay.addEventListener('click', () => {
+          const secondarySlideNavImageEl = secondarySlideNavEl.getElementsByTagName('li')[0];
+          if (secondarySlideNavImageEl) secondarySlideNavImageEl.parentElement.innerHTML = secondarySlideHtmlString(isTrue, legendUrl);
+        });
+
+        viewer.addStyle(legendUrl, {
+          icon: { src: legendUrl },
           extendedLegend: isTrue
         });
         layer.set('style', legendUrl);
-      });
-    });
+      })
+    }
+  })
   }
 
   function layerConditions(layer) {
