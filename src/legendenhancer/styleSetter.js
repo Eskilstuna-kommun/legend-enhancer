@@ -58,7 +58,7 @@ const StyleSetter = function StyleSetter(options = {}) {
       if (layer.get('ArcGIS') == true) {
         const legendUrl = getLegendGraphicUrl(layer, 'image/png');
 
-        if (!layer.get('print_theme') == true) { 
+        if (!Boolean(layer.get('print_theme'))) { 
           const iconSpan = layerOverlays[key].overlay.firstElementChild.getElementsByClassName('icon')[0];
           const iconHtml = `<img class="cover" src="${legendUrl}" style="">`;
           iconSpan.innerHTML = iconHtml;
@@ -67,7 +67,7 @@ const StyleSetter = function StyleSetter(options = {}) {
         // Adds event to set the secondary image when clicking a layer in legend
         layerOverlays[key].overlay.addEventListener('click', () => {
           const secondarySlideNavImageEl = secondarySlideNavEl.getElementsByTagName('li')[0];
-          if (secondarySlideNavImageEl) secondarySlideNavImageEl.parentElement.innerHTML = secondarySlideHtmlString(Boolean(layer.get('theme')), legendUrl);
+          if (secondarySlideNavImageEl) secondarySlideNavImageEl.parentElement.innerHTML = secondarySlideHtmlString(Boolean(layer.get('print_theme')), legendUrl);
         });
 
         /* Adds the style to the map and updates the layer's style.
