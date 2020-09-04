@@ -58,7 +58,7 @@ const StyleSetter = function StyleSetter(options = {}) {
       if (layer.get('ArcGIS') == true) {
         const legendUrl = getLegendGraphicUrl(layer, 'image/png');
 
-        if (!layer.get('theme')) { 
+        if (!layer.get('print_theme') == true) { 
           const iconSpan = layerOverlays[key].overlay.firstElementChild.getElementsByClassName('icon')[0];
           const iconHtml = `<img class="cover" src="${legendUrl}" style="">`;
           iconSpan.innerHTML = iconHtml;
