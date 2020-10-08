@@ -28,8 +28,10 @@ const StyleSetter = function StyleSetter(options = {}) {
     return fetch(url)
       .then(response => response.json())
       .then(json => {
-        if (json.Legend[0].rules[0].length > 1 || json.Legend.length > 1 || json.Legend[0].rules[0].symbolizers[0].Raster.colormap.entries.length > 1) { return true; }
-        return false;
+      const value = json.Legend[0]?.rules[0]?.symbolizers[0]?.Raster?.colormap?.entries;
+          if (json.Legend[0].rules.length > 1 || json.Legend.length > 1) { return true; }
+          else if (value) { return true; }
+          return false;
       });
   }
   // The html is different depending if extended is true, AKA isTheme
