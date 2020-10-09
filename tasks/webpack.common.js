@@ -37,7 +37,7 @@ module.exports = {
   },
   plugins: [
     new webpack.ProvidePlugin({
-      fetch: 'imports-loader?this=>global!exports-loader?global.fetch!whatwg-fetch'
+      fetch: 'exports-loader?self.fetch!whatwg-fetch/dist/fetch.umd'
     })
   ]  
 };
