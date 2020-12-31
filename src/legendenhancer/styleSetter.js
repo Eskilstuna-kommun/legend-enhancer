@@ -18,6 +18,9 @@ const StyleSetter = function StyleSetter(options = {}) {
     const url = source.getUrls()[0];
     let legendUrl = `${url}?layer=${layer.get('name')}&format=${format}&version=1.1.1&request=getLegendGraphic&scale=${scale}`;
     if (useDpi) { legendUrl += `&legend_options=dpi:${dpi}`; }
+    if (layer.get('styleName') != "default") {
+      legendUrl += `&style=${layer.get('styleName')}`;
+    }
     if (legendUrl.charAt(0) === '/') { legendUrl = `${window.location.protocol}//${window.location.hostname}${legendUrl}`; }
     return legendUrl;
   }
@@ -91,7 +94,7 @@ const StyleSetter = function StyleSetter(options = {}) {
 
         layerOverlays[key].overlay.addEventListener('click', () => {
           const secondarySlideNavImageEl = secondarySlideNavEl.getElementsByTagName('li')[0];
-          if (secondarySlideNavImageEl) secondarySlideNavImageEl.parentElement.innerHTML = secondarySlideHtmlString(isTrue, legendUrl);
+          if (secondarySlideNavImageEl) secondarySlideNavImageEl.parentElement.innerHTML = secondarySlideHtmlString(isTrue, getLegendGraphicUrl(layer, 'image/png', !isTrue));
         });
 
         viewer.addStyle(legendUrl, {

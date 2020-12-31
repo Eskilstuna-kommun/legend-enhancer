@@ -1,14 +1,16 @@
 import 'Origo';
-import GroupIndication from './legendenhancer/groupindication'
-import StyleSetter from './legendenhancer/styleSetter'
-import AbstractSetter from './legendenhancer/abstractSetter'
-import ChangeRemoveButtonStyle from './legendenhancer/changeRemoveButtonStyle'
+import GroupIndication from './legendenhancer/groupindication';
+import StyleSetter from './legendenhancer/styleSetter';
+import AlterLayerStyle from './legendenhancer/alterLayerStyle';
+import AbstractSetter from './legendenhancer/abstractSetter';
+import ChangeRemoveButtonStyle from './legendenhancer/changeRemoveButtonStyle';
 
 const Legendenhancer = function Legendenhancer(options = {}) {
-  let {
+  const {
     groupIndication,
     abstractSetter,
     styleSetter,
+    alterLayerStyle,
     changeremovebuttonstyle
   } = options;
   let allDivTagElements;
@@ -31,14 +33,15 @@ const Legendenhancer = function Legendenhancer(options = {}) {
   return Origo.ui.Component({
     name: 'legendenhancer',
     onAdd(e) {
-      let viewer = e.target;
+      const viewer = e.target;
       allDivTagElements = document.getElementsByTagName('div');
-      let layerOvs = getLayerOverlays(e.target.getLayers());
+      const layerOvs = getLayerOverlays(e.target.getLayers());
       if (groupIndication) this.addComponent(GroupIndication({ viewer, layerOvs, ...groupIndication }));
       if (abstractSetter) this.addComponent(AbstractSetter({ viewer, layerOvs, ...abstractSetter }));
       if (styleSetter) this.addComponent(StyleSetter({ viewer, layerOvs, ...styleSetter }));
-      if (changeremovebuttonstyle) this.addComponent(ChangeRemoveButtonStyle({ viewer, layerOvs, allDivTagElements, ...changeremovebuttonstyle })); 
+      if (alterLayerStyle) this.addComponent(AlterLayerStyle({ viewer, layerOvs, ...alterLayerStyle }));
+      if (changeremovebuttonstyle) this.addComponent(ChangeRemoveButtonStyle({ viewer, layerOvs, allDivTagElements, ...changeremovebuttonstyle }));
     }
   });
-}
+};
 export default Legendenhancer;
