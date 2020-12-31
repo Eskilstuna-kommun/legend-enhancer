@@ -17,6 +17,11 @@ The plugin can be loaded like this in an html-file:
                     // fragment-plugins are activated by including these objects, corresponding to their names.
                     groupIndication: { 
                     },
+                    alterLayerStyle: {
+			url : 'URL',
+			scale: 401,
+			dpi: 300
+		    },
                     styleSetter : {
                         scale: 401,
                         dpi: 600
