@@ -88,7 +88,12 @@ const AbstractSetter = function AbstractSetter(options = {}) {
                     let secondarySlideNavEl = document.getElementsByClassName('secondary')[0];
                     if (secondarySlideNavEl != null) {
                       let targetElement = secondarySlideNavEl.firstElementChild.lastElementChild.lastElementChild;
-                      if (targetElement) targetElement.innerHTML = record.getElementsByTagName('dct:abstract')[0].textContent;
+                      if (targetElement) {		
+                        const abstractElement = document.createElement('DIV');
+                        abstractElement.classList.add('padding-small', 'padding-x', 'text-small');
+                        abstractElement.innerHTML = record.getElementsByTagName('dct:abstract')[0].textContent;
+                        targetElement.appendChild(abstractElement);
+                        }
                     }
                   });
                 }
