@@ -10,6 +10,14 @@ const AlterLayerStyle = function AlterLayerStyle(options = {}) {
     url
   } = options;
 
+  const pluginName = 'alterlayerstyleplugin';
+  let alteredStyles = {};
+
+  function addToMapState(mapState) {
+    // eslint-disable-next-line no-param-reassign
+    mapState[pluginName] = alteredStyles;
+  }
+
   const layerConditions = function layerConditions(layer) {
     return layer.get('group') !== 'background'
       && layer.get('group') !== 'txt'
@@ -18,6 +26,8 @@ const AlterLayerStyle = function AlterLayerStyle(options = {}) {
 
   // Switches to correct icon in legend and sets new style in map
   const switchStyle = function switchStyle(layer, style, e, LURL) {
+    alteredStyles[layer.get('name')] = style;
+
     const legendIconUrl = LURL[style] ? `${LURL[style]}&scale=401` : LURL;
     const styles = [[
       {
@@ -90,6 +100,12 @@ const AlterLayerStyle = function AlterLayerStyle(options = {}) {
     return legendUrl;
   }
 
+  function setAlteredStyles(e) {
+    Object.keys(alteredStyles).forEach(alteredStyle => {
+      switchStyle(viewer.getLayer(alteredStyle.layerName), alteredStyle.styleName, e, getLegendGraphicUrl(layerOvs[alteredStyle.layerName].layer, 'application/json', true));
+    });
+  }
+
   // eslint-disable-next-line no-undef
   return Origo.ui.Component({
     // eslint-disable-next-line no-restricted-globals
@@ -144,20 +160,25 @@ const AlterLayerStyle = function AlterLayerStyle(options = {}) {
       layers.forEach(layer => {
         if (layer) {
           layerOvs[layer.get('name')].overlay.addEventListener('click', () => {
-            const secondarySlideNavEl = document.getElementsByClassName('secondary')[0];
-            if (secondarySlideNavEl != null) {
-              const targetElement = secondarySlideNavEl// This mess is to navigate to the right DOM element
-                .firstElementChild
-                .lastElementChild
-                .firstElementChild
-                .firstElementChild;
-              if (targetElement) {
-                targetElement.parentNode.insertBefore(createSelector(layer), targetElement.nextSibling);
-              }
+            // This mess is to navigate to the right DOM element
+            const targetElement = document.querySelector('.secondary > div > div > div > ul');
+            if (targetElement) {
+              targetElement.parentNode.insertBefore(createSelector(layer), targetElement.nextSibling);
             }
           });
         }
       });
+
+      const sharemap = viewer.getControlByName('sharemap');
+      if (sharemap && sharemap.options.storeMethod === 'saveStateToServer') {
+        sharemap.addParamsToGetMapState(pluginName, addToMapState);
+      }
+
+      const urlParams = viewer.getUrlParams();
+      if (urlParams[pluginName] && urlParams[pluginName].length > 0) {
+        alteredStyles = urlParams[pluginName];
+        setAlteredStyles(e);
+      }
     }
   });
 };
