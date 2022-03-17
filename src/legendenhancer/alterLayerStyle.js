@@ -101,8 +101,8 @@ const AlterLayerStyle = function AlterLayerStyle(options = {}) {
   }
 
   function setAlteredStyles(e) {
-    Object.keys(alteredStyles).forEach(alteredStyle => {
-      switchStyle(viewer.getLayer(alteredStyle.layerName), alteredStyle.styleName, e, getLegendGraphicUrl(layerOvs[alteredStyle.layerName].layer, 'application/json', true));
+    Object.keys(alteredStyles).forEach(layerName => {
+      switchStyle(viewer.getLayer(layerName), alteredStyles[layerName], e, getLegendGraphicUrl(layerOvs[layerName].layer, 'application/json', true));
     });
   }
 
@@ -175,7 +175,7 @@ const AlterLayerStyle = function AlterLayerStyle(options = {}) {
       }
 
       const urlParams = viewer.getUrlParams();
-      if (urlParams[pluginName] && urlParams[pluginName].length > 0) {
+      if (urlParams[pluginName]) {
         alteredStyles = urlParams[pluginName];
         setAlteredStyles(e);
       }
