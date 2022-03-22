@@ -13,6 +13,7 @@ const AlterLayerStyle = function AlterLayerStyle(options = {}) {
   const pluginName = 'alterlayerstyleplugin';
   let alteredStyles = {};
 
+  // Add altered style to mapstate when sharing map
   function addToMapState(mapState) {
     // eslint-disable-next-line no-param-reassign
     mapState[pluginName] = alteredStyles;
@@ -100,9 +101,13 @@ const AlterLayerStyle = function AlterLayerStyle(options = {}) {
     return legendUrl;
   }
 
+  // Set altered styles when reading from mapstate
   function setAlteredStyles(e) {
     Object.keys(alteredStyles).forEach(layerName => {
-      switchStyle(viewer.getLayer(layerName), alteredStyles[layerName], e, getLegendGraphicUrl(layerOvs[layerName].layer, 'application/json', true));
+      const layer = viewer.getLayer(layerName);
+      if (layer) {
+        switchStyle(layer, alteredStyles[layerName], e, getLegendGraphicUrl(layer, 'application/json', true));
+      }
     });
   }
 
@@ -127,45 +132,59 @@ const AlterLayerStyle = function AlterLayerStyle(options = {}) {
 
       // Creates the dropdown element
       const createSelector = function createSelector(layer) {
-        const sel = document.createElement('SELECT');
+        const layerName = layer.get('name');
+        const selectElement = document.createElement('SELECT');
         const LURL = [];
-        if (layerStyles[layer.get('name')]) {
-          layerStyles[layer.get('name')].forEach(style => {
-            const opt = document.createElement('option');
-            opt.setAttribute('value', style[0]);
-            const nod = document.createTextNode(style[1]);
-            opt.appendChild(nod);
-            sel.appendChild(opt);
-            LURL[style[0]] = style[2];
-          });
-        } else {
+        if (!layerStyles[layerName]) {
           return document.createElement('div');
         }
-        sel.onchange = (e) => {
-          let temp = []; // keeps dropdown list updated to current active style
-          layerStyles[layer.get('name')] = layerStyles[layer.get('name')].filter(item => {
-            if (item[0] === sel.value) {
-              temp = item;
-              return false;
-            }
-            return true;
-          });
-          layerStyles[layer.get('name')].unshift(temp);
+        layerStyles[layerName].forEach(style => {
+          const optionElement = document.createElement('option');
+          const textNode = document.createTextNode(style[1]);
 
-          switchStyle(layer, sel.value, e, LURL);
+          optionElement.setAttribute('value', style[0]);
+          optionElement.appendChild(textNode);
+          selectElement.appendChild(optionElement);
+          LURL[style[0]] = style[2];
+        });
+        if (alteredStyles[layerName]) {
+          selectElement.value = alteredStyles[layerName];
+        }
+        selectElement.onchange = (selectChangeEvent) => {
+          switchStyle(layer, selectElement.value, selectChangeEvent, LURL);
         };
-        return sel;
+        return selectElement;
+      };
+
+      const onLayerInfoClick = (layer) => {
+        const targetElement = document.querySelector('.secondary > div > div > div > ul');
+        if (targetElement) {
+          targetElement.parentNode.insertBefore(createSelector(layer), targetElement.nextSibling);
+        }
       };
 
       layers.forEach(layer => {
         if (layer) {
-          layerOvs[layer.get('name')].overlay.addEventListener('click', () => {
-            // This mess is to navigate to the right DOM element
-            const targetElement = document.querySelector('.secondary > div > div > div > ul');
-            if (targetElement) {
-              targetElement.parentNode.insertBefore(createSelector(layer), targetElement.nextSibling);
-            }
-          });
+          layerOvs[layer.get('name')].overlay.addEventListener('click', () => onLayerInfoClick(layer));
+        }
+      });
+
+      viewer.getMap().getLayers().on('add', async (event) => {
+        const layer = event.element;
+        if (!layer) return;
+
+        // Because layers from layermanager get added through this method after urlParams are checked we call setAlteredStyles here as well
+        setAlteredStyles(e);
+
+        // Update styles list to get info for new layer
+        layers.push(layer);
+        layerStyles = await getStyles(layers);
+
+        // Find the new layer in DOM
+        const layerTitle = layer.get('title');
+        const targetDiv = [...document.getElementsByTagName('div')].find(a => a.textContent === layerTitle);
+        if (targetDiv) {
+          targetDiv.parentElement.addEventListener('click', () => onLayerInfoClick(layer));
         }
       });
 
