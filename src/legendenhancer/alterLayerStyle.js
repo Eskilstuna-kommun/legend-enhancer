@@ -45,7 +45,6 @@ const AlterLayerStyle = function AlterLayerStyle(options = {}) {
     layer.set('STYLES', style); // updates layer on map
     // eslint-disable-next-line no-underscore-dangle
     layer.get('source').params_.STYLES = style; // forces layer cashe refresh with clear()
-    console.log(e.target);
     if (!e.target.name) { // Checks if switch style is onAdd or selector
       const layerTitle = layer.get('title');
       const targetDiv = [...document.getElementsByTagName('div')].find(a => a.textContent === layerTitle);
