@@ -11,7 +11,10 @@ const AlterLayerStyle = function AlterLayerStyle(options = {}) {
   } = options;
 
   const pluginName = 'alterlayerstyleplugin';
+  // Keep track of chosen styles
   let alteredStyles = {};
+  // Keep track of which layers have had events attached to their options popup
+  const layersEventAdded = {};
 
   // Add altered style to mapstate when sharing map
   function addToMapState(mapState) {
@@ -42,9 +45,13 @@ const AlterLayerStyle = function AlterLayerStyle(options = {}) {
     layer.set('STYLES', style); // updates layer on map
     // eslint-disable-next-line no-underscore-dangle
     layer.get('source').params_.STYLES = style; // forces layer cashe refresh with clear()
-
+    console.log(e.target);
     if (!e.target.name) { // Checks if switch style is onAdd or selector
-      document.querySelector(`li[title="${layer.get('title')}"]`).firstChild.firstChild.nextElementSibling.firstChild.src = `${legendIconUrl}&legend_options=dpi:300`;
+      const layerTitle = layer.get('title');
+      const targetDiv = [...document.getElementsByTagName('div')].find(a => a.textContent === layerTitle);
+      if (targetDiv?.previousElementSibling?.firstChild?.nextElementSibling?.firstChild) {
+        targetDiv.previousElementSibling.firstChild.nextElementSibling.firstChild.src = `${legendIconUrl}&legend_options=dpi:300`;
+      }
       const elemtarget = e.target.parentNode.firstElementChild.firstElementChild.firstElementChild;
       // Different position in DOM for theme/point icon
       if (elemtarget.src) {
@@ -118,7 +125,6 @@ const AlterLayerStyle = function AlterLayerStyle(options = {}) {
     onAdd(e) {
       const layers = [];
       let layerStyles = {};
-
       Object.keys(layerOvs).forEach(key => {
         if (layerConditions(layerOvs[key].layer)) {
           layers.push(layerOvs[key].layer);
@@ -169,6 +175,16 @@ const AlterLayerStyle = function AlterLayerStyle(options = {}) {
         }
       });
 
+      // Add click event for the new popup
+      const onOptionClick = (layer) => {
+        if (layersEventAdded[layer.get('name')]) return;
+        layersEventAdded[layer.get('name')] = true;
+        const newPopupDiv = document.querySelector('.popup-menu:last-of-type');
+        if (newPopupDiv?.firstChild?.firstChild) {
+          newPopupDiv.firstChild.firstChild.addEventListener('click', () => onLayerInfoClick(layer));
+        }
+      };
+
       viewer.getMap().getLayers().on('add', async (event) => {
         const layer = event.element;
         if (!layer) return;
@@ -183,9 +199,17 @@ const AlterLayerStyle = function AlterLayerStyle(options = {}) {
         // Find the new layer in DOM
         const layerTitle = layer.get('title');
         const targetDiv = [...document.getElementsByTagName('div')].find(a => a.textContent === layerTitle);
-        if (targetDiv) {
-          targetDiv.parentElement.addEventListener('click', () => onLayerInfoClick(layer));
+        if (targetDiv?.parentElement?.lastChild) {
+          // When a layer has multiple options a popup with choices is rendered
+          // Here we wait for a click event so we can attach a listener to the button in the new popup
+          targetDiv.parentElement.lastChild.addEventListener('click', () => onOptionClick(layer));
         }
+      });
+
+      viewer.getMap().getLayers().on('remove', async (event) => {
+        const layer = event.element;
+        if (!layer) return;
+        layersEventAdded[layer.get('name')] = false;
       });
 
       const sharemap = viewer.getControlByName('sharemap');
