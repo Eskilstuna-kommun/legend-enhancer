@@ -28,35 +28,49 @@ const AlterLayerStyle = function AlterLayerStyle(options = {}) {
       && layer.get('name') !== 'measure';
   };
 
-  // Switches to correct icon in legend and sets new style in map
-  const switchStyle = function switchStyle(layer, style, e, LURL) {
-    alteredStyles[layer.get('name')] = style;
+  const checkIfTheme = async (layer) => {
+    const url = getLegendGraphicUrl(layer, 'application/json');
+    const response = await fetch(url);
+    const json = await response.json();
+    const value = json.Legend[0]?.rules[0]?.symbolizers[0]?.Raster?.colormap?.entries;
+    return json.Legend[0].rules.length > 1 || json.Legend.length > 1 || value;
+  }
 
-    const legendIconUrl = LURL[style] ? `${LURL[style]}&scale=401` : LURL;
+  // Switches to correct icon in legend and sets new style in map
+  const switchStyle = async (layer, style, e) => {
+    alteredStyles[layer.get('name')] = style;
+    layer.set('styleName', style); // updates icon onclick @ legend title
+    const legendIconUrl = getLegendGraphicUrl(layer, 'image/png', true);
+    const isTheme = await checkIfTheme(layer);
     const styles = [[
       {
         icon: { src: legendIconUrl },
         wmsStyle: style,
-        extendedLegend: Boolean(layer.get('theme')) // layers that have theme-like styles from point doesnt flip this boolean
+        extendedLegend: isTheme ? isTheme : Boolean(layer.get('theme')) // layers that have theme-like styles from point doesnt flip this boolean
       }]];
 
     viewer.addStyle(style, styles); // Adds only once, skips if duplicated
-    layer.set('styleName', style); // updates icon onclick @ legend title
     layer.set('STYLES', style); // updates layer on map
     // eslint-disable-next-line no-underscore-dangle
     layer.get('source').params_.STYLES = style; // forces layer cashe refresh with clear()
-    if (!e.target.name) { // Checks if switch style is onAdd or selector
-      const layerTitle = layer.get('title');
-      const targetDiv = [...document.getElementsByTagName('div')].find(a => a.textContent === layerTitle);
-      if (targetDiv?.previousElementSibling?.firstChild?.nextElementSibling?.firstChild) {
-        targetDiv.previousElementSibling.firstChild.nextElementSibling.firstChild.src = `${legendIconUrl}&legend_options=dpi:300`;
-      }
-      const elemtarget = e.target.parentNode.firstElementChild.firstElementChild.firstElementChild;
-      // Different position in DOM for theme/point icon
-      if (elemtarget.src) {
-        elemtarget.src = legendIconUrl;
+    const layerTitle = layer.get('title');
+    const targetDiv = [...document.getElementsByTagName('div')].find(a => a.textContent === layerTitle);
+    if (targetDiv?.previousSibling?.firstChild?.nextSibling) {
+      if (isTheme) {
+        targetDiv.previousSibling.classList.add('grey-lightest');
+        targetDiv.previousSibling.firstChild.nextSibling.innerHTML = '<svg class="" style=""><use xlink:href="#o_list_24px"></use></svg>';
       } else {
-        elemtarget.firstElementChild.src = `${legendIconUrl}&legend_options=dpi:300`;
+        targetDiv.previousSibling.classList.remove('grey-lightest');
+        targetDiv.previousSibling.firstChild.nextSibling.innerHTML = `<img class="cover" src="${legendIconUrl}" style="" alt="Lager ikon" title="">`;
+      }
+    }
+    
+    if (!e.target.name && e.target?.parentNode?.firstElementChild?.firstElementChild) { // Checks if switch style is onAdd or selector
+      const elemtarget = e.target.parentNode.firstElementChild.firstElementChild;
+      if (isTheme) {
+        elemtarget.innerHTML = `<img class="extendedlegend pointer" src="${legendIconUrl}" title="" style="">`;
+      } else {
+        elemtarget.innerHTML = `<div class="icon-small round"><img class="cover" src="${legendIconUrl}" style="" alt="Lager ikon" title=""></div>`;
       }
     }
     layer.get('source').clear();
@@ -82,8 +96,7 @@ const AlterLayerStyle = function AlterLayerStyle(options = {}) {
               Array.from(styles).forEach(style => {
                 const name = style.getElementsByTagName('Name')[0].innerHTML;
                 const title = style.getElementsByTagName('Title')[0].innerHTML;
-                const LURL = style.getElementsByTagName('OnlineResource')[0].attributes[2].value;
-                styleCollection.push([name, title, LURL]);
+                styleCollection.push([name, title]);
               });
 
               matchingLayer[layer.get('name')] = styleCollection;
@@ -108,11 +121,11 @@ const AlterLayerStyle = function AlterLayerStyle(options = {}) {
   }
 
   // Set altered styles when reading from mapstate
-  function setAlteredStyles(e) {
-    Object.keys(alteredStyles).forEach(layerName => {
+  async function setAlteredStyles(e) {
+    Object.keys(alteredStyles).forEach(async (layerName) => {
       const layer = viewer.getLayer(layerName);
       if (layer) {
-        switchStyle(layer, alteredStyles[layerName], e, getLegendGraphicUrl(layer, 'application/json', true));
+        await switchStyle(layer, alteredStyles[layerName], e);
       }
     });
   }
@@ -124,11 +137,11 @@ const AlterLayerStyle = function AlterLayerStyle(options = {}) {
     onAdd(e) {
       const layers = [];
       let layerStyles = {};
-      Object.keys(layerOvs).forEach(key => {
+      Object.keys(layerOvs).forEach(async key => {
         if (layerConditions(layerOvs[key].layer)) {
           layers.push(layerOvs[key].layer);
           if (layerOvs[key].layer.get('wmsStyle')) { // if style is given in index.json, switch it here during onAdd
-            switchStyle(layerOvs[key].layer, layerOvs[key].layer.get('wmsStyle'), e, getLegendGraphicUrl(layerOvs[key].layer, 'application/json', true));
+            await switchStyle(layerOvs[key].layer, layerOvs[key].layer.get('wmsStyle'), e);
           }
         }
       });
@@ -139,7 +152,6 @@ const AlterLayerStyle = function AlterLayerStyle(options = {}) {
       const createSelector = function createSelector(layer) {
         const layerName = layer.get('name');
         const selectElement = document.createElement('SELECT');
-        const LURL = [];
         if (!layerStyles[layerName]) {
           return document.createElement('div');
         }
@@ -150,13 +162,12 @@ const AlterLayerStyle = function AlterLayerStyle(options = {}) {
           optionElement.setAttribute('value', style[0]);
           optionElement.appendChild(textNode);
           selectElement.appendChild(optionElement);
-          LURL[style[0]] = style[2];
         });
         if (alteredStyles[layerName]) {
           selectElement.value = alteredStyles[layerName];
         }
-        selectElement.onchange = (selectChangeEvent) => {
-          switchStyle(layer, selectElement.value, selectChangeEvent, LURL);
+        selectElement.onchange = async (selectChangeEvent) => {
+          await switchStyle(layer, selectElement.value, selectChangeEvent);
         };
         return selectElement;
       };
