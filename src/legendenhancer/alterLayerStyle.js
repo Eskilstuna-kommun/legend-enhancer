@@ -22,6 +22,28 @@ const AlterLayerStyle = function AlterLayerStyle(options = {}) {
     mapState[pluginName] = alteredStyles;
   }
 
+  const getLegendGraphicJSON = async (url) => {
+    try {
+      if (!url) {
+        return null;
+      }
+      const response = await fetch(url);
+      const json = await response.json();
+      return json;
+    } catch (e) {
+      console.warn(e);
+      return null;
+    }
+  };
+
+  const getJSONContent = async (layer) => {
+    const json = await getLegendGraphicJSON(getLegendGraphicUrl(layer, 'application/json'));
+    if (json?.Legend[0]?.rules.length > 1) {
+      return json.Legend[0].rules;
+    }
+    return [];
+  };
+
   const layerConditions = function layerConditions(layer) {
     return layer.get('group') !== 'background'
       && layer.get('group') !== 'txt'
@@ -29,11 +51,12 @@ const AlterLayerStyle = function AlterLayerStyle(options = {}) {
   };
 
   const checkIfTheme = async (layer) => {
-    const url = getLegendGraphicUrl(layer, 'application/json');
-    const response = await fetch(url);
-    const json = await response.json();
+    const json = await getLegendGraphicJSON(getLegendGraphicUrl(layer, 'application/json'));
     const value = json.Legend[0]?.rules[0]?.symbolizers[0]?.Raster?.colormap?.entries;
-    return json.Legend[0].rules.length > 1 || json.Legend.length > 1 || value;
+    if (json.Legend[0].rules.length > 1 || json.Legend.length > 1 || value) {
+      return true;
+    }
+    return false;
   }
 
   // Switches to correct icon in legend and sets new style in map
@@ -41,13 +64,29 @@ const AlterLayerStyle = function AlterLayerStyle(options = {}) {
     alteredStyles[layer.get('name')] = style;
     layer.set('styleName', style); // updates icon onclick @ legend title
     const legendIconUrl = getLegendGraphicUrl(layer, 'image/png', true);
+    const extraStyles = await getJSONContent(layer);
     const isTheme = await checkIfTheme(layer);
-    const styles = [[
+
+    let styles = [[
       {
         icon: { src: legendIconUrl },
         wmsStyle: style,
-        extendedLegend: isTheme ? isTheme : Boolean(layer.get('theme')) // layers that have theme-like styles from point doesnt flip this boolean
+        extendedLegend: isTheme || Boolean(layer.get('theme')) ? true : false // layers that have theme-like styles from point doesnt flip this boolean
       }]];
+
+    if (extraStyles.length) {
+      let styleRules = [];
+      extraStyles.forEach((extraStyle) => {
+        styleRules.push([
+          {
+            icon: { src: legendIconUrl + '&rule=' + extraStyle.name },
+            label: extraStyle.title,
+            wmsStyle: style,
+            extendedLegend: false
+          }]);
+      })
+      styles = styleRules;
+    }
 
     viewer.addStyle(style, styles); // Adds only once, skips if duplicated
     layer.set('STYLES', style); // updates layer on map

@@ -11,6 +11,8 @@ const StyleSetter = function StyleSetter(options = {}) {
   const name = 'stylesetter';
   const layerOverlays = {};
   let secondarySlideNavEl;
+  // Keep track of which layers have had events attached to their options popup
+  const layersEventAdded = {};
 
   //should be okay with ArcGIS WMS layers as is, provided useDpi is never true
   function getLegendGraphicUrl(layer, format, useDpi) {
@@ -26,17 +28,17 @@ const StyleSetter = function StyleSetter(options = {}) {
   }
 
   //should never handle ArcGIS WMS layers
-  function checkIfTheme(layer) {
+  async function checkIfTheme(layer) {
     const url = getLegendGraphicUrl(layer, 'application/json');
-    return fetch(url)
-      .then(response => response.json())
-      .then(json => {
-      const value = json.Legend[0]?.rules[0]?.symbolizers[0]?.Raster?.colormap?.entries;
-          if (json.Legend[0].rules.length > 1 || json.Legend.length > 1) { return true; }
-          else if (value) { return true; }
-          return false;
-      });
+    const response = await fetch(url);
+    const json = await response.json();
+    const value = json.Legend[0]?.rules[0]?.symbolizers[0]?.Raster?.colormap?.entries;
+    if (json.Legend[0].rules.length > 1 || json.Legend.length > 1 || value) {
+      return true;
+    }
+    return false;
   }
+
   // The html is different depending if extended is true, AKA isTheme
   function secondarySlideHtmlString(isTheme, legendUrl) {
     if (isTheme) {
@@ -55,12 +57,12 @@ const StyleSetter = function StyleSetter(options = {}) {
   // if Arcgis then don't checkIfTheme
   // but merely check if "theme"
   function setLegendGraphicStyles() {
-    Object.keys(layerOverlays).forEach(key => {
+    Object.keys(layerOverlays).forEach(async key => {
       const layer = layerOverlays[key].layer;
 
       // A separate case is needed for ArcGIS WMS layers since there is no application/json legendGraphic
       if (layer.get('ArcGIS') == true) {
-        const legendUrl = getLegendGraphicUrl(layer, 'image/png');
+        const legendUrl = getLegendGraphicUrl(layer, 'image/png', true);
 
         if (!Boolean(layer.get('print_theme'))) { 
           const iconSpan = layerOverlays[key].overlay.firstElementChild.getElementsByClassName('icon')[0];
@@ -83,7 +85,7 @@ const StyleSetter = function StyleSetter(options = {}) {
         layer.set('style', legendUrl);
 
       } else {
-        checkIfTheme(layer).then(isTrue => {
+        const isTrue = await checkIfTheme(layer);
         const legendUrl = isTrue ? getLegendGraphicUrl(layer, 'image/png') : getLegendGraphicUrl(layer, 'image/png', true);
 
         if (!isTrue) {
@@ -92,9 +94,10 @@ const StyleSetter = function StyleSetter(options = {}) {
           iconSpan.innerHTML = iconHtml;
         }
 
-        layerOverlays[key].overlay.addEventListener('click', () => {
+        layerOverlays[key].overlay.addEventListener('click', async () => {
           const secondarySlideNavImageEl = secondarySlideNavEl.getElementsByTagName('li')[0];
-          if (secondarySlideNavImageEl) secondarySlideNavImageEl.parentElement.innerHTML = secondarySlideHtmlString(isTrue, getLegendGraphicUrl(layer, 'image/png', !isTrue));
+          const isTheme = await checkIfTheme(layer);
+          if (secondarySlideNavImageEl) secondarySlideNavImageEl.parentElement.innerHTML = secondarySlideHtmlString(isTheme, getLegendGraphicUrl(layer, 'image/png', true));
         });
 
         viewer.addStyle(legendUrl, {
@@ -102,10 +105,44 @@ const StyleSetter = function StyleSetter(options = {}) {
           extendedLegend: isTrue
         });
         layer.set('style', legendUrl);
-      })
-    }
-  })
+      }
+    })
   }
+
+  // Add click event for the new popup
+  const onOptionClick = (layer) => {
+    if (layersEventAdded[layer.get('name')]) return;
+    layersEventAdded[layer.get('name')] = true;
+
+    const newPopupDiv = document.querySelector('.popup-menu:last-of-type');
+    if (newPopupDiv?.firstChild?.firstChild) {
+      newPopupDiv.firstChild.firstChild.addEventListener('click', async () => {
+        const secondarySlideNavImageEl = secondarySlideNavEl.getElementsByTagName('li')[0];
+        const isTheme = await checkIfTheme(layer);
+        if (secondarySlideNavImageEl) secondarySlideNavImageEl.parentElement.innerHTML = secondarySlideHtmlString(isTheme, getLegendGraphicUrl(layer, 'image/png', true));
+      });
+    }
+  };
+
+  viewer.getMap().getLayers().on('add', async (event) => {
+    const layer = event.element;
+    if (!layer) return;
+
+    // Find the new layer in DOM
+    const layerTitle = layer.get('title');
+    const targetDiv = [...document.getElementsByTagName('div')].find(a => a.textContent === layerTitle);
+    if (targetDiv?.parentElement?.lastChild) {
+      // When a layer has multiple options a popup with choices is rendered
+      // Here we wait for a click event so we can attach a listener to the button in the new popup
+      targetDiv.parentElement.lastChild.addEventListener('click', () => onOptionClick(layer));
+    }
+  });
+
+  viewer.getMap().getLayers().on('remove', async (event) => {
+    const layer = event.element;
+    if (!layer) return;
+    layersEventAdded[layer.get('name')] = false;
+  });
 
   function layerConditions(layer) {
     return layer.get('group') !== 'background'
