@@ -71,7 +71,7 @@ const AlterLayerStyle = function AlterLayerStyle(options = {}) {
       {
         icon: { src: legendIconUrl },
         wmsStyle: style,
-        extendedLegend: isTheme || Boolean(layer.get('theme')) ? true : false // layers that have theme-like styles from point doesnt flip this boolean
+        extendedLegend: isTheme // layers that have theme-like styles from point doesnt flip this boolean
       }]];
 
     if (extraStyles.length) {
