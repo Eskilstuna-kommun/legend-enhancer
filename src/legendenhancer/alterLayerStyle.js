@@ -13,8 +13,6 @@ const AlterLayerStyle = function AlterLayerStyle(options = {}) {
   const pluginName = 'alterlayerstyleplugin';
   // Keep track of chosen styles
   let alteredStyles = {};
-  // Keep track of which layers have had events attached to their options popup
-  const layersEventAdded = {};
 
   // Add altered style to mapstate when sharing map
   function addToMapState(mapState) {
@@ -60,7 +58,7 @@ const AlterLayerStyle = function AlterLayerStyle(options = {}) {
   }
 
   // Switches to correct icon in legend and sets new style in map
-  const switchStyle = async (layer, style, e) => {
+  const switchStyle = async (layer, style, e, visibleLayers = false) => {
     alteredStyles[layer.get('name')] = style;
     layer.set('styleName', style); // updates icon onclick @ legend title
     const legendIconUrl = getLegendGraphicUrl(layer, 'image/png', true);
@@ -93,7 +91,19 @@ const AlterLayerStyle = function AlterLayerStyle(options = {}) {
     // eslint-disable-next-line no-underscore-dangle
     layer.get('source').params_.STYLES = style; // forces layer cashe refresh with clear()
     const layerTitle = layer.get('title');
-    const targetDiv = [...document.getElementsByTagName('div')].find(a => a.textContent === layerTitle);
+    if (visibleLayers) {
+      const visibleTabDiv = [...document.querySelectorAll('.o-layerswitcher-overlays:nth-child(2):not(.hidden) li:not(.hidden) div')].find(a => a.textContent === layerTitle);
+      if (visibleTabDiv?.previousSibling?.firstChild?.nextSibling) {
+        if (isTheme) {
+          visibleTabDiv.previousSibling.classList.add('grey-lightest');
+          visibleTabDiv.previousSibling.firstChild.nextSibling.innerHTML = '<svg class="" style=""><use xlink:href="#o_list_24px"></use></svg>';
+        } else {
+          visibleTabDiv.previousSibling.classList.remove('grey-lightest');
+          visibleTabDiv.previousSibling.firstChild.nextSibling.innerHTML = `<img class="cover" src="${legendIconUrl}" style="" alt="Lager ikon" title="">`;
+        }
+      }
+    }
+    const targetDiv = [...document.querySelectorAll('.o-layerswitcher-overlays:first-child div')].find(a => a.textContent === layerTitle);
     if (targetDiv?.previousSibling?.firstChild?.nextSibling) {
       if (isTheme) {
         targetDiv.previousSibling.classList.add('grey-lightest');
@@ -175,6 +185,7 @@ const AlterLayerStyle = function AlterLayerStyle(options = {}) {
     name,
     onAdd(e) {
       const layers = [];
+      const layerManagerLayers = [];
       let layerStyles = {};
       Object.keys(layerOvs).forEach(async key => {
         if (layerConditions(layerOvs[key].layer)) {
@@ -188,7 +199,7 @@ const AlterLayerStyle = function AlterLayerStyle(options = {}) {
       getStyles(layers).then(res => { layerStyles = res; });
 
       // Creates the dropdown element
-      const createSelector = function createSelector(layer) {
+      const createSelector = function createSelector(layer, visibleLayers = false) {
         const layerName = layer.get('name');
         const selectElement = document.createElement('SELECT');
         if (!layerStyles[layerName]) {
@@ -206,15 +217,21 @@ const AlterLayerStyle = function AlterLayerStyle(options = {}) {
           selectElement.value = alteredStyles[layerName];
         }
         selectElement.onchange = async (selectChangeEvent) => {
-          await switchStyle(layer, selectElement.value, selectChangeEvent);
+          await switchStyle(layer, selectElement.value, selectChangeEvent, visibleLayers);
         };
         return selectElement;
       };
 
-      const onLayerInfoClick = (layer) => {
-        const targetElement = document.querySelector('.secondary > div > div > div > ul');
+      const onLayerInfoClick = (layer, visibleLayers = false) => {
+        let targetElement = document.querySelector('.secondary > div > div > div > ul');
+        if (visibleLayers) {
+          const elements = document.querySelectorAll('.secondary > div > div > div > ul');
+          if (elements) {
+            targetElement = elements[elements.length - 1];
+          }
+        }
         if (targetElement) {
-          targetElement.parentNode.insertBefore(createSelector(layer), targetElement.nextSibling);
+          targetElement.parentNode.insertBefore(createSelector(layer, visibleLayers), targetElement.nextSibling);
         }
       };
 
@@ -225,14 +242,34 @@ const AlterLayerStyle = function AlterLayerStyle(options = {}) {
       });
 
       // Add click event for the new popup
-      const onOptionClick = (layer) => {
-        if (layersEventAdded[layer.get('name')]) return;
-        layersEventAdded[layer.get('name')] = true;
+      const onOptionClick = (layer, visibleLayers = false) => {
         const newPopupDiv = document.querySelector('.popup-menu:last-of-type');
         if (newPopupDiv?.firstChild?.firstChild) {
-          newPopupDiv.firstChild.firstChild.addEventListener('click', () => onLayerInfoClick(layer));
+          newPopupDiv.firstChild.firstChild.addEventListener('click', () => onLayerInfoClick(layer, visibleLayers));
         }
       };
+
+      // To set layerswitch dropdown for the 'OnlyShowVisibleLayers' box
+      const toggleShowVisibleLayers = () => {
+        const visibleLayers = document.querySelectorAll('.o-layerswitcher-overlays:nth-child(2):not(.hidden) li:not(.hidden)');
+        if (!visibleLayers) return;
+        visibleLayers.forEach(visibleLayer => {
+          const titleDiv = visibleLayer.querySelector('div');
+          if (!titleDiv) return;
+          const layerTitle = titleDiv.textContent;
+          const layer = layers.find(l => l.get('title') === layerTitle);
+          if (!layer) return;
+          const infoButton = visibleLayer.querySelector('button:last-of-type');
+          if (!infoButton) return;
+          if (layerManagerLayers.some(l => l.get('name') === layer.get('name'))) {
+            infoButton.addEventListener('click', () => onOptionClick(layer, true), { once: true });
+            return;
+          }
+          infoButton.addEventListener('click', () => onLayerInfoClick(layer, true));
+        });
+      };
+
+      viewer.on('active:togglevisibleLayers', toggleShowVisibleLayers);
 
       viewer.getMap().getLayers().on('add', async (event) => {
         const layer = event.element;
@@ -243,6 +280,7 @@ const AlterLayerStyle = function AlterLayerStyle(options = {}) {
 
         // Update styles list to get info for new layer
         layers.push(layer);
+        layerManagerLayers.push(layer);
         layerStyles = await getStyles(layers);
 
         // Find the new layer in DOM
@@ -251,14 +289,8 @@ const AlterLayerStyle = function AlterLayerStyle(options = {}) {
         if (targetDiv?.parentElement?.lastChild) {
           // When a layer has multiple options a popup with choices is rendered
           // Here we wait for a click event so we can attach a listener to the button in the new popup
-          targetDiv.parentElement.lastChild.addEventListener('click', () => onOptionClick(layer));
+          targetDiv.parentElement.lastChild.addEventListener('click', () => onOptionClick(layer), { once: true });
         }
-      });
-
-      viewer.getMap().getLayers().on('remove', async (event) => {
-        const layer = event.element;
-        if (!layer) return;
-        layersEventAdded[layer.get('name')] = false;
       });
 
       const sharemap = viewer.getControlByName('sharemap');
