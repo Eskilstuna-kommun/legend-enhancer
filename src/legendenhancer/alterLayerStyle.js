@@ -50,6 +50,7 @@ const AlterLayerStyle = function AlterLayerStyle(options = {}) {
 
   const checkIfTheme = async (layer) => {
     const json = await getLegendGraphicJSON(getLegendGraphicUrl(layer, 'application/json'));
+    if (!json) return false; 
     const value = json.Legend[0]?.rules[0]?.symbolizers[0]?.Raster?.colormap?.entries;
     if (json.Legend[0].rules.length > 1 || json.Legend.length > 1 || value) {
       return true;
@@ -91,6 +92,7 @@ const AlterLayerStyle = function AlterLayerStyle(options = {}) {
     // eslint-disable-next-line no-underscore-dangle
     layer.get('source').params_.STYLES = style; // forces layer cashe refresh with clear()
     const layerTitle = layer.get('title');
+    console.log('🚀 ~ file: alterLayerStyle.js ~ line 95 ~ switchStyle ~ visibleLayers', visibleLayers);
     if (visibleLayers) {
       const visibleTabDiv = [...document.querySelectorAll('.o-layerswitcher-overlays:nth-child(2):not(.hidden) li:not(.hidden) div')].find(a => a.textContent === layerTitle);
       if (visibleTabDiv?.previousSibling?.firstChild?.nextSibling) {

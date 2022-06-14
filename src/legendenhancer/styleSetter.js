@@ -32,6 +32,7 @@ const StyleSetter = function StyleSetter(options = {}) {
     const url = getLegendGraphicUrl(layer, 'application/json');
     const response = await fetch(url);
     const json = await response.json();
+    if (!json) return false;
     const value = json.Legend[0]?.rules[0]?.symbolizers[0]?.Raster?.colormap?.entries;
     if (json.Legend[0].rules.length > 1 || json.Legend.length > 1 || value) {
       return true;
@@ -133,29 +134,41 @@ const StyleSetter = function StyleSetter(options = {}) {
   const toggleShowVisibleLayers = () => {
     const visibleLayers = document.querySelectorAll('.o-layerswitcher-overlays:nth-child(2):not(.hidden) li:not(.hidden)');
     if (!visibleLayers) return;
-    visibleLayers.forEach(visibleLayer => {
+    visibleLayers.forEach(async visibleLayer => {
       const titleDiv = visibleLayer.querySelector('div');
       if (!titleDiv) return;
+
       const layerTitle = titleDiv.textContent;
       const layer = layers.find(l => l.get('title') === layerTitle);
       if (!layer) return;
+
+      const isTheme = await checkIfTheme(layer);
+      if ((layer.get('ArcGIS') == true && !Boolean(layer.get('print_theme'))) || (!layer.get('ArcGIS') && !isTheme)) {
+        const legendUrl = getLegendGraphicUrl(layer, 'image/png', true);
+        const iconSpan = visibleLayer.getElementsByClassName('icon')[0];
+        if (iconSpan) {
+          const iconHtml = `<img class="cover" src="${legendUrl}" style="">`;
+          iconSpan.innerHTML = iconHtml;
+        }
+      }
+
       const infoButton = visibleLayer.querySelector('button:last-of-type');
       if (!infoButton) return;
       if (layerManagerLayers.some(l => l.get('name') === layer.get('name'))) {
         infoButton.addEventListener('click', () => onOptionClick(layer, true), { once: true });
         return;
       }
+
       infoButton.addEventListener('click', async () => {
         const elements = document.querySelectorAll('.secondary');
-        if (elements) {
-          const targetElement = elements[elements.length - 1];
-          if (targetElement) {
-            const secondarySlideNavImageEl = targetElement.getElementsByTagName('li')[0];
-            const isTheme = await checkIfTheme(layer);
-            if (secondarySlideNavImageEl) {
-              secondarySlideNavImageEl.parentElement.innerHTML = secondarySlideHtmlString(isTheme, getLegendGraphicUrl(layer, 'image/png', true));
-            }
-          }
+        if (!elements) return;
+
+        const targetElement = elements[elements.length - 1];
+        if (!targetElement) return;
+
+        const secondarySlideNavImageEl = targetElement.getElementsByTagName('li')[0];
+        if (secondarySlideNavImageEl) {
+          secondarySlideNavImageEl.parentElement.innerHTML = secondarySlideHtmlString(isTheme, getLegendGraphicUrl(layer, 'image/png', true));
         }
       });
     });
