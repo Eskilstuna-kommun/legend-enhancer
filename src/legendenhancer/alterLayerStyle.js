@@ -10,36 +10,118 @@ const AlterLayerStyle = function AlterLayerStyle(options = {}) {
     url
   } = options;
 
+  const pluginName = 'alterlayerstyleplugin';
+  // Keep track of chosen styles
+  let alteredStyles = {};
+
+  // Add altered style to mapstate when sharing map
+  function addToMapState(mapState) {
+    // eslint-disable-next-line no-param-reassign
+    mapState[pluginName] = alteredStyles;
+  }
+
+  const getLegendGraphicJSON = async (url) => {
+    try {
+      if (!url) {
+        return null;
+      }
+      const response = await fetch(url);
+      const json = await response.json();
+      return json;
+    } catch (e) {
+      console.warn(e);
+      return null;
+    }
+  };
+
+  const getJSONContent = async (layer) => {
+    const json = await getLegendGraphicJSON(getLegendGraphicUrl(layer, 'application/json'));
+    if (json?.Legend[0]?.rules.length > 1) {
+      return json.Legend[0].rules;
+    }
+    return [];
+  };
+
   const layerConditions = function layerConditions(layer) {
     return layer.get('group') !== 'background'
       && layer.get('group') !== 'txt'
       && layer.get('name') !== 'measure';
   };
 
+  const checkIfTheme = async (layer) => {
+    const json = await getLegendGraphicJSON(getLegendGraphicUrl(layer, 'application/json'));
+    if (!json) return false; 
+    const value = json.Legend[0]?.rules[0]?.symbolizers[0]?.Raster?.colormap?.entries;
+    if (json.Legend[0].rules.length > 1 || json.Legend.length > 1 || value) {
+      return true;
+    }
+    return false;
+  }
+
   // Switches to correct icon in legend and sets new style in map
-  const switchStyle = function switchStyle(layer, style, e, LURL) {
-    const legendIconUrl = LURL[style] ? `${LURL[style]}&scale=401` : LURL;
-    const styles = [[
+  const switchStyle = async (layer, style, e, visibleLayers = false) => {
+    alteredStyles[layer.get('name')] = style;
+    layer.set('styleName', style); // updates icon onclick @ legend title
+    const legendIconUrl = getLegendGraphicUrl(layer, 'image/png', true);
+    const extraStyles = await getJSONContent(layer);
+    const isTheme = await checkIfTheme(layer);
+
+    let styles = [[
       {
         icon: { src: legendIconUrl },
         wmsStyle: style,
-        extendedLegend: Boolean(layer.get('theme')) // layers that have theme-like styles from point doesnt flip this boolean
+        extendedLegend: isTheme // layers that have theme-like styles from point doesnt flip this boolean
       }]];
 
+    if (extraStyles.length) {
+      let styleRules = [];
+      extraStyles.forEach((extraStyle) => {
+        styleRules.push([
+          {
+            icon: { src: legendIconUrl + '&rule=' + extraStyle.name },
+            label: extraStyle.title,
+            wmsStyle: style,
+            extendedLegend: false
+          }]);
+      })
+      styles = styleRules;
+    }
+
     viewer.addStyle(style, styles); // Adds only once, skips if duplicated
-    layer.set('styleName', style); // updates icon onclick @ legend title
     layer.set('STYLES', style); // updates layer on map
     // eslint-disable-next-line no-underscore-dangle
     layer.get('source').params_.STYLES = style; // forces layer cashe refresh with clear()
-
-    if (!e.target.name) { // Checks if switch style is onAdd or selector
-      document.querySelector(`li[title="${layer.get('title')}"]`).firstChild.firstChild.nextElementSibling.firstChild.src = `${legendIconUrl}&legend_options=dpi:300`;
-      const elemtarget = e.target.parentNode.firstElementChild.firstElementChild.firstElementChild;
-      // Different position in DOM for theme/point icon
-      if (elemtarget.src) {
-        elemtarget.src = legendIconUrl;
+    const layerTitle = layer.get('title');
+    console.log('🚀 ~ file: alterLayerStyle.js ~ line 95 ~ switchStyle ~ visibleLayers', visibleLayers);
+    if (visibleLayers) {
+      const visibleTabDiv = [...document.querySelectorAll('.o-layerswitcher-overlays:nth-child(2):not(.hidden) li:not(.hidden) div')].find(a => a.textContent === layerTitle);
+      if (visibleTabDiv?.previousSibling?.firstChild?.nextSibling) {
+        if (isTheme) {
+          visibleTabDiv.previousSibling.classList.add('grey-lightest');
+          visibleTabDiv.previousSibling.firstChild.nextSibling.innerHTML = '<svg class="" style=""><use xlink:href="#o_list_24px"></use></svg>';
+        } else {
+          visibleTabDiv.previousSibling.classList.remove('grey-lightest');
+          visibleTabDiv.previousSibling.firstChild.nextSibling.innerHTML = `<img class="cover" src="${legendIconUrl}" style="" alt="Lager ikon" title="">`;
+        }
+      }
+    }
+    const targetDiv = [...document.querySelectorAll('.o-layerswitcher-overlays:first-child div')].find(a => a.textContent === layerTitle);
+    if (targetDiv?.previousSibling?.firstChild?.nextSibling) {
+      if (isTheme) {
+        targetDiv.previousSibling.classList.add('grey-lightest');
+        targetDiv.previousSibling.firstChild.nextSibling.innerHTML = '<svg class="" style=""><use xlink:href="#o_list_24px"></use></svg>';
       } else {
-        elemtarget.firstElementChild.src = `${legendIconUrl}&legend_options=dpi:300`;
+        targetDiv.previousSibling.classList.remove('grey-lightest');
+        targetDiv.previousSibling.firstChild.nextSibling.innerHTML = `<img class="cover" src="${legendIconUrl}" style="" alt="Lager ikon" title="">`;
+      }
+    }
+    
+    if (!e.target.name && e.target?.parentNode?.firstElementChild?.firstElementChild) { // Checks if switch style is onAdd or selector
+      const elemtarget = e.target.parentNode.firstElementChild.firstElementChild;
+      if (isTheme) {
+        elemtarget.innerHTML = `<img class="extendedlegend pointer" src="${legendIconUrl}" title="" style="">`;
+      } else {
+        elemtarget.innerHTML = `<div class="icon-small round"><img class="cover" src="${legendIconUrl}" style="" alt="Lager ikon" title=""></div>`;
       }
     }
     layer.get('source').clear();
@@ -65,8 +147,7 @@ const AlterLayerStyle = function AlterLayerStyle(options = {}) {
               Array.from(styles).forEach(style => {
                 const name = style.getElementsByTagName('Name')[0].innerHTML;
                 const title = style.getElementsByTagName('Title')[0].innerHTML;
-                const LURL = style.getElementsByTagName('OnlineResource')[0].attributes[2].value;
-                styleCollection.push([name, title, LURL]);
+                styleCollection.push([name, title]);
               });
 
               matchingLayer[layer.get('name')] = styleCollection;
@@ -90,19 +171,29 @@ const AlterLayerStyle = function AlterLayerStyle(options = {}) {
     return legendUrl;
   }
 
+  // Set altered styles when reading from mapstate
+  async function setAlteredStyles(e) {
+    Object.keys(alteredStyles).forEach(async (layerName) => {
+      const layer = viewer.getLayer(layerName);
+      if (layer) {
+        await switchStyle(layer, alteredStyles[layerName], e);
+      }
+    });
+  }
+
   // eslint-disable-next-line no-undef
   return Origo.ui.Component({
     // eslint-disable-next-line no-restricted-globals
     name,
     onAdd(e) {
       const layers = [];
+      const layerManagerLayers = [];
       let layerStyles = {};
-
-      Object.keys(layerOvs).forEach(key => {
+      Object.keys(layerOvs).forEach(async key => {
         if (layerConditions(layerOvs[key].layer)) {
           layers.push(layerOvs[key].layer);
           if (layerOvs[key].layer.get('wmsStyle')) { // if style is given in index.json, switch it here during onAdd
-            switchStyle(layerOvs[key].layer, layerOvs[key].layer.get('wmsStyle'), e, getLegendGraphicUrl(layerOvs[key].layer, 'application/json', true));
+            await switchStyle(layerOvs[key].layer, layerOvs[key].layer.get('wmsStyle'), e);
           }
         }
       });
@@ -110,54 +201,110 @@ const AlterLayerStyle = function AlterLayerStyle(options = {}) {
       getStyles(layers).then(res => { layerStyles = res; });
 
       // Creates the dropdown element
-      const createSelector = function createSelector(layer) {
-        const sel = document.createElement('SELECT');
-        const LURL = [];
-        if (layerStyles[layer.get('name')]) {
-          layerStyles[layer.get('name')].forEach(style => {
-            const opt = document.createElement('option');
-            opt.setAttribute('value', style[0]);
-            const nod = document.createTextNode(style[1]);
-            opt.appendChild(nod);
-            sel.appendChild(opt);
-            LURL[style[0]] = style[2];
-          });
-        } else {
+      const createSelector = function createSelector(layer, visibleLayers = false) {
+        const layerName = layer.get('name');
+        const selectElement = document.createElement('SELECT');
+        if (!layerStyles[layerName]) {
           return document.createElement('div');
         }
-        sel.onchange = (e) => {
-          let temp = []; // keeps dropdown list updated to current active style
-          layerStyles[layer.get('name')] = layerStyles[layer.get('name')].filter(item => {
-            if (item[0] === sel.value) {
-              temp = item;
-              return false;
-            }
-            return true;
-          });
-          layerStyles[layer.get('name')].unshift(temp);
+        layerStyles[layerName].forEach(style => {
+          const optionElement = document.createElement('option');
+          const textNode = document.createTextNode(style[1]);
 
-          switchStyle(layer, sel.value, e, LURL);
+          optionElement.setAttribute('value', style[0]);
+          optionElement.appendChild(textNode);
+          selectElement.appendChild(optionElement);
+        });
+        if (alteredStyles[layerName]) {
+          selectElement.value = alteredStyles[layerName];
+        }
+        selectElement.onchange = async (selectChangeEvent) => {
+          await switchStyle(layer, selectElement.value, selectChangeEvent, visibleLayers);
         };
-        return sel;
+        return selectElement;
+      };
+
+      const onLayerInfoClick = (layer, visibleLayers = false) => {
+        let targetElement = document.querySelector('.secondary > div > div > div > ul');
+        if (visibleLayers) {
+          const elements = document.querySelectorAll('.secondary > div > div > div > ul');
+          if (elements) {
+            targetElement = elements[elements.length - 1];
+          }
+        }
+        if (targetElement) {
+          targetElement.parentNode.insertBefore(createSelector(layer, visibleLayers), targetElement.nextSibling);
+        }
       };
 
       layers.forEach(layer => {
         if (layer) {
-          layerOvs[layer.get('name')].overlay.addEventListener('click', () => {
-            const secondarySlideNavEl = document.getElementsByClassName('secondary')[0];
-            if (secondarySlideNavEl != null) {
-              const targetElement = secondarySlideNavEl// This mess is to navigate to the right DOM element
-                .firstElementChild
-                .lastElementChild
-                .firstElementChild
-                .firstElementChild;
-              if (targetElement) {
-                targetElement.parentNode.insertBefore(createSelector(layer), targetElement.nextSibling);
-              }
-            }
-          });
+          layerOvs[layer.get('name')].overlay.addEventListener('click', () => onLayerInfoClick(layer));
         }
       });
+
+      // Add click event for the new popup
+      const onOptionClick = (layer, visibleLayers = false) => {
+        const newPopupDiv = document.querySelector('.popup-menu:last-of-type');
+        if (newPopupDiv?.firstChild?.firstChild) {
+          newPopupDiv.firstChild.firstChild.addEventListener('click', () => onLayerInfoClick(layer, visibleLayers));
+        }
+      };
+
+      // To set layerswitch dropdown for the 'OnlyShowVisibleLayers' box
+      const toggleShowVisibleLayers = () => {
+        const visibleLayers = document.querySelectorAll('.o-layerswitcher-overlays:nth-child(2):not(.hidden) li:not(.hidden)');
+        if (!visibleLayers) return;
+        visibleLayers.forEach(visibleLayer => {
+          const titleDiv = visibleLayer.querySelector('div');
+          if (!titleDiv) return;
+          const layerTitle = titleDiv.textContent;
+          const layer = layers.find(l => l.get('title') === layerTitle);
+          if (!layer) return;
+          const infoButton = visibleLayer.querySelector('button:last-of-type');
+          if (!infoButton) return;
+          if (layerManagerLayers.some(l => l.get('name') === layer.get('name'))) {
+            infoButton.addEventListener('click', () => onOptionClick(layer, true), { once: true });
+            return;
+          }
+          infoButton.addEventListener('click', () => onLayerInfoClick(layer, true));
+        });
+      };
+
+      viewer.on('active:togglevisibleLayers', toggleShowVisibleLayers);
+
+      viewer.getMap().getLayers().on('add', async (event) => {
+        const layer = event.element;
+        if (!layer) return;
+
+        // Because layers from layermanager get added through this method after urlParams are checked we call setAlteredStyles here as well
+        setAlteredStyles(e);
+
+        // Update styles list to get info for new layer
+        layers.push(layer);
+        layerManagerLayers.push(layer);
+        layerStyles = await getStyles(layers);
+
+        // Find the new layer in DOM
+        const layerTitle = layer.get('title');
+        const targetDiv = [...document.getElementsByTagName('div')].find(a => a.textContent === layerTitle);
+        if (targetDiv?.parentElement?.lastChild) {
+          // When a layer has multiple options a popup with choices is rendered
+          // Here we wait for a click event so we can attach a listener to the button in the new popup
+          targetDiv.parentElement.lastChild.addEventListener('click', () => onOptionClick(layer), { once: true });
+        }
+      });
+
+      const sharemap = viewer.getControlByName('sharemap');
+      if (sharemap && sharemap.options.storeMethod === 'saveStateToServer') {
+        sharemap.addParamsToGetMapState(pluginName, addToMapState);
+      }
+
+      const urlParams = viewer.getUrlParams();
+      if (urlParams[pluginName]) {
+        alteredStyles = urlParams[pluginName];
+        setAlteredStyles(e);
+      }
     }
   });
 };

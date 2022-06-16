@@ -34,7 +34,7 @@ const Legendenhancer = function Legendenhancer(options = {}) {
     name: 'legendenhancer',
     onAdd(e) {
       const viewer = e.target;
-      allDivTagElements = document.getElementsByTagName('div');
+      allDivTagElements = document.querySelectorAll('.o-layerswitcher-overlays:first-child div');
       const layerOvs = getLayerOverlays(e.target.getLayers());
       if (groupIndication) this.addComponent(GroupIndication({ viewer, layerOvs, ...groupIndication }));
       if (abstractSetter) this.addComponent(AbstractSetter({ viewer, layerOvs, ...abstractSetter }));
