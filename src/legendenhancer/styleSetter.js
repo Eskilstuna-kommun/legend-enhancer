@@ -15,7 +15,7 @@ const StyleSetter = function StyleSetter(options = {}) {
   let layerManagerLayers = [];
 
   //should be okay with ArcGIS WMS layers as is, provided useDpi is never true
-  function getLegendGraphicUrl(layer, format, useDpi) {
+  function getLegendGraphicUrl(layer, format, useDpi = false) {
     const source = layer.get('source');
     const url = source.getUrls()[0];
     let legendUrl = `${url}?layer=${layer.get('name')}&format=${format}&version=1.1.1&request=getLegendGraphic&scale=${scale}`;
@@ -63,7 +63,7 @@ const StyleSetter = function StyleSetter(options = {}) {
 
       // A separate case is needed for ArcGIS WMS layers since there is no application/json legendGraphic
       if (layer.get('ArcGIS') == true) {
-        const legendUrl = getLegendGraphicUrl(layer, 'image/png', true);
+        const legendUrl = getLegendGraphicUrl(layer, 'image/png');
 
         if (!Boolean(layer.get('print_theme'))) { 
           const iconSpan = layerOverlays[key].overlay.firstElementChild.getElementsByClassName('icon')[0];
@@ -126,7 +126,7 @@ const StyleSetter = function StyleSetter(options = {}) {
           }
         }
         const isTheme = await checkIfTheme(layer);
-        if (secondarySlideNavImageEl) secondarySlideNavImageEl.parentElement.innerHTML = secondarySlideHtmlString(isTheme, getLegendGraphicUrl(layer, 'image/png', true));
+        if (secondarySlideNavImageEl) secondarySlideNavImageEl.parentElement.innerHTML = secondarySlideHtmlString(isTheme, getLegendGraphicUrl(layer, 'image/png', layer.get('ArcGIS') == true));
       });
     }
   };
@@ -141,10 +141,10 @@ const StyleSetter = function StyleSetter(options = {}) {
       const layerTitle = titleDiv.textContent;
       const layer = layers.find(l => l.get('title') === layerTitle);
       if (!layer) return;
-
-      const isTheme = await checkIfTheme(layer);
+      
+      const isTheme = layer.get('ArcGIS') == true ? Boolean(layer.get('print_theme')) : await checkIfTheme(layer);
       if ((layer.get('ArcGIS') == true && !Boolean(layer.get('print_theme'))) || (!layer.get('ArcGIS') && !isTheme)) {
-        const legendUrl = getLegendGraphicUrl(layer, 'image/png', true);
+        const legendUrl = getLegendGraphicUrl(layer, 'image/png', layer.get('ArcGIS') == true);
         const iconSpan = visibleLayer.getElementsByClassName('icon')[0];
         if (iconSpan) {
           const iconHtml = `<img class="cover" src="${legendUrl}" style="">`;
@@ -168,7 +168,7 @@ const StyleSetter = function StyleSetter(options = {}) {
 
         const secondarySlideNavImageEl = targetElement.getElementsByTagName('li')[0];
         if (secondarySlideNavImageEl) {
-          secondarySlideNavImageEl.parentElement.innerHTML = secondarySlideHtmlString(isTheme, getLegendGraphicUrl(layer, 'image/png', true));
+          secondarySlideNavImageEl.parentElement.innerHTML = secondarySlideHtmlString(isTheme, getLegendGraphicUrl(layer, 'image/png', layer.get('ArcGIS') == true));
         }
       });
     });

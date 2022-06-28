@@ -92,7 +92,6 @@ const AlterLayerStyle = function AlterLayerStyle(options = {}) {
     // eslint-disable-next-line no-underscore-dangle
     layer.get('source').params_.STYLES = style; // forces layer cashe refresh with clear()
     const layerTitle = layer.get('title');
-    console.log('🚀 ~ file: alterLayerStyle.js ~ line 95 ~ switchStyle ~ visibleLayers', visibleLayers);
     if (visibleLayers) {
       const visibleTabDiv = [...document.querySelectorAll('.o-layerswitcher-overlays:nth-child(2):not(.hidden) li:not(.hidden) div')].find(a => a.textContent === layerTitle);
       if (visibleTabDiv?.previousSibling?.firstChild?.nextSibling) {
