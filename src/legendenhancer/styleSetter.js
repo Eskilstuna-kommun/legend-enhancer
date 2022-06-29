@@ -14,13 +14,23 @@ const StyleSetter = function StyleSetter(options = {}) {
   let layers = [];
   let layerManagerLayers = [];
 
+  // Layers added through LayerManager have their 'styleName' set as a url. If this is the case we don't want to concat it to the legendGraphicUrl
+  const isUrl = string => {
+    try {
+      return Boolean(new URL(string));
+    }
+    catch(e){ 
+      return false;
+    }
+  }
+
   //should be okay with ArcGIS WMS layers as is, provided useDpi is never true
   function getLegendGraphicUrl(layer, format, useDpi = false) {
     const source = layer.get('source');
     const url = source.getUrls()[0];
     let legendUrl = `${url}?layer=${layer.get('name')}&format=${format}&version=1.1.1&request=getLegendGraphic&scale=${scale}`;
     if (useDpi) { legendUrl += `&legend_options=dpi:${dpi}`; }
-    if (layer.get('styleName') != "default") {
+    if (layer.get('styleName') != "default" && !isUrl(layer.get('styleName'))) {
       legendUrl += `&style=${layer.get('styleName')}`;
     }
     if (legendUrl.charAt(0) === '/') { legendUrl = `${window.location.protocol}//${window.location.hostname}${legendUrl}`; }
