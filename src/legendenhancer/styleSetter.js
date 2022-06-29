@@ -72,7 +72,7 @@ const StyleSetter = function StyleSetter(options = {}) {
         }
 
         // Adds event to set the secondary image when clicking a layer in legend
-        layerOverlays[key].overlay.addEventListener('click', () => {
+        layerOverlays[key].overlay.lastChild.addEventListener('click', () => {
           const secondarySlideNavImageEl = secondarySlideNavEl.getElementsByTagName('li')[0];
           if (secondarySlideNavImageEl) secondarySlideNavImageEl.parentElement.innerHTML = secondarySlideHtmlString(Boolean(layer.get('print_theme')), getLegendGraphicUrl(layer, 'image/png'));
         });
@@ -95,7 +95,7 @@ const StyleSetter = function StyleSetter(options = {}) {
           iconSpan.innerHTML = iconHtml;
         }
 
-        layerOverlays[key].overlay.addEventListener('click', async () => {
+        layerOverlays[key].overlay.lastChild.addEventListener('click', async () => {
           const secondarySlideNavImageEl = secondarySlideNavEl.getElementsByTagName('li')[0];
           const isTheme = await checkIfTheme(layer);
           if (secondarySlideNavImageEl) secondarySlideNavImageEl.parentElement.innerHTML = secondarySlideHtmlString(isTheme, getLegendGraphicUrl(layer, 'image/png', !isTheme));
