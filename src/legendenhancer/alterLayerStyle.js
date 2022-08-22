@@ -62,9 +62,10 @@ const AlterLayerStyle = function AlterLayerStyle(options = {}) {
   const switchStyle = async (layer, style, e, visibleLayers = false) => {
     alteredStyles[layer.get('name')] = style;
     layer.set('styleName', style); // updates icon onclick @ legend title
-    const legendIconUrl = getLegendGraphicUrl(layer, 'image/png', true);
     const extraStyles = await getJSONContent(layer);
     const isTheme = await checkIfTheme(layer);
+    const legendIconUrl = getLegendGraphicUrl(layer, 'image/png', true);
+    const legendGraphicUrl = getLegendGraphicUrl(layer, 'image/png', !Boolean(layer.get('ArcGIS') == true) && !isTheme);
 
     let styles = [[
       {
@@ -92,7 +93,6 @@ const AlterLayerStyle = function AlterLayerStyle(options = {}) {
     // eslint-disable-next-line no-underscore-dangle
     layer.get('source').params_.STYLES = style; // forces layer cashe refresh with clear()
     const layerTitle = layer.get('title');
-    console.log('🚀 ~ file: alterLayerStyle.js ~ line 95 ~ switchStyle ~ visibleLayers', visibleLayers);
     if (visibleLayers) {
       const visibleTabDiv = [...document.querySelectorAll('.o-layerswitcher-overlays:nth-child(2):not(.hidden) li:not(.hidden) div')].find(a => a.textContent === layerTitle);
       if (visibleTabDiv?.previousSibling?.firstChild?.nextSibling) {
@@ -119,9 +119,9 @@ const AlterLayerStyle = function AlterLayerStyle(options = {}) {
     if (!e.target.name && e.target?.parentNode?.firstElementChild?.firstElementChild) { // Checks if switch style is onAdd or selector
       const elemtarget = e.target.parentNode.firstElementChild.firstElementChild;
       if (isTheme) {
-        elemtarget.innerHTML = `<img class="extendedlegend pointer" src="${legendIconUrl}" title="" style="">`;
+        elemtarget.innerHTML = `<img class="extendedlegend pointer" src="${legendGraphicUrl}" title="" style="">`;
       } else {
-        elemtarget.innerHTML = `<div class="icon-small round"><img class="cover" src="${legendIconUrl}" style="" alt="Lager ikon" title=""></div>`;
+        elemtarget.innerHTML = `<div class="icon-small round"><img class="cover" src="${legendGraphicUrl}" style="" alt="Lager ikon" title=""></div>`;
       }
     }
     layer.get('source').clear();
@@ -159,7 +159,7 @@ const AlterLayerStyle = function AlterLayerStyle(options = {}) {
       }).catch(err => { swal('Något gick fel', err, 'warning'); });
   };
   // This is for onLoad switching of style, otherwise URL comes from GetCapabilities
-  function getLegendGraphicUrl(layer, format, useDpi) {
+  function getLegendGraphicUrl(layer, format, useDpi = false) {
     const source = layer.get('source');
     const URL = source.getUrls()[0];
     let legendUrl = `${URL}?layer=${layer.get('name')}&format=${format}&version=1.1.1&request=getLegendGraphic&scale=${scale}`;

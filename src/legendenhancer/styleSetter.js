@@ -14,13 +14,23 @@ const StyleSetter = function StyleSetter(options = {}) {
   let layers = [];
   let layerManagerLayers = [];
 
+  // Layers added through LayerManager have their 'styleName' set as a url. If this is the case we don't want to concat it to the legendGraphicUrl
+  const isUrl = string => {
+    try {
+      return Boolean(new URL(string));
+    }
+    catch(e){ 
+      return false;
+    }
+  }
+
   //should be okay with ArcGIS WMS layers as is, provided useDpi is never true
-  function getLegendGraphicUrl(layer, format, useDpi) {
+  function getLegendGraphicUrl(layer, format, useDpi = false) {
     const source = layer.get('source');
     const url = source.getUrls()[0];
     let legendUrl = `${url}?layer=${layer.get('name')}&format=${format}&version=1.1.1&request=getLegendGraphic&scale=${scale}`;
     if (useDpi) { legendUrl += `&legend_options=dpi:${dpi}`; }
-    if (layer.get('styleName') != "default") {
+    if (layer.get('styleName') != "default" && !isUrl(layer.get('styleName'))) {
       legendUrl += `&style=${layer.get('styleName')}`;
     }
     if (legendUrl.charAt(0) === '/') { legendUrl = `${window.location.protocol}//${window.location.hostname}${legendUrl}`; }
@@ -63,7 +73,7 @@ const StyleSetter = function StyleSetter(options = {}) {
 
       // A separate case is needed for ArcGIS WMS layers since there is no application/json legendGraphic
       if (layer.get('ArcGIS') == true) {
-        const legendUrl = getLegendGraphicUrl(layer, 'image/png', true);
+        const legendUrl = getLegendGraphicUrl(layer, 'image/png');
 
         if (!Boolean(layer.get('print_theme'))) { 
           const iconSpan = layerOverlays[key].overlay.firstElementChild.getElementsByClassName('icon')[0];
@@ -72,9 +82,9 @@ const StyleSetter = function StyleSetter(options = {}) {
         }
 
         // Adds event to set the secondary image when clicking a layer in legend
-        layerOverlays[key].overlay.addEventListener('click', () => {
+        layerOverlays[key].overlay.lastChild.addEventListener('click', () => {
           const secondarySlideNavImageEl = secondarySlideNavEl.getElementsByTagName('li')[0];
-          if (secondarySlideNavImageEl) secondarySlideNavImageEl.parentElement.innerHTML = secondarySlideHtmlString(Boolean(layer.get('print_theme')), legendUrl);
+          if (secondarySlideNavImageEl) secondarySlideNavImageEl.parentElement.innerHTML = secondarySlideHtmlString(Boolean(layer.get('print_theme')), getLegendGraphicUrl(layer, 'image/png'));
         });
 
         /* Adds the style to the map and updates the layer's style.
@@ -87,18 +97,18 @@ const StyleSetter = function StyleSetter(options = {}) {
 
       } else {
         const isTrue = await checkIfTheme(layer);
-        const legendUrl = isTrue ? getLegendGraphicUrl(layer, 'image/png') : getLegendGraphicUrl(layer, 'image/png', true);
-
+        const legendUrl = getLegendGraphicUrl(layer, 'image/png', true);
+        
         if (!isTrue) {
           const iconSpan = layerOverlays[key].overlay.firstElementChild.getElementsByClassName('icon')[0];
           const iconHtml = `<img class="cover" src="${legendUrl}" style="">`;
           iconSpan.innerHTML = iconHtml;
         }
 
-        layerOverlays[key].overlay.addEventListener('click', async () => {
+        layerOverlays[key].overlay.lastChild.addEventListener('click', async () => {
           const secondarySlideNavImageEl = secondarySlideNavEl.getElementsByTagName('li')[0];
           const isTheme = await checkIfTheme(layer);
-          if (secondarySlideNavImageEl) secondarySlideNavImageEl.parentElement.innerHTML = secondarySlideHtmlString(isTheme, getLegendGraphicUrl(layer, 'image/png', true));
+          if (secondarySlideNavImageEl) secondarySlideNavImageEl.parentElement.innerHTML = secondarySlideHtmlString(isTheme, getLegendGraphicUrl(layer, 'image/png', !isTheme));
         });
 
         viewer.addStyle(legendUrl, {
@@ -125,8 +135,8 @@ const StyleSetter = function StyleSetter(options = {}) {
             }
           }
         }
-        const isTheme = await checkIfTheme(layer);
-        if (secondarySlideNavImageEl) secondarySlideNavImageEl.parentElement.innerHTML = secondarySlideHtmlString(isTheme, getLegendGraphicUrl(layer, 'image/png', true));
+        const isTheme = layer.get('ArcGIS') == true ? Boolean(layer.get('print_theme')) : await checkIfTheme(layer);
+        if (secondarySlideNavImageEl) secondarySlideNavImageEl.parentElement.innerHTML = secondarySlideHtmlString(isTheme, getLegendGraphicUrl(layer, 'image/png', !Boolean(layer.get('ArcGIS') == true) && !isTheme));
       });
     }
   };
@@ -141,10 +151,10 @@ const StyleSetter = function StyleSetter(options = {}) {
       const layerTitle = titleDiv.textContent;
       const layer = layers.find(l => l.get('title') === layerTitle);
       if (!layer) return;
-
-      const isTheme = await checkIfTheme(layer);
+      
+      const isTheme = layer.get('ArcGIS') == true ? Boolean(layer.get('print_theme')) : await checkIfTheme(layer);
       if ((layer.get('ArcGIS') == true && !Boolean(layer.get('print_theme'))) || (!layer.get('ArcGIS') && !isTheme)) {
-        const legendUrl = getLegendGraphicUrl(layer, 'image/png', true);
+        const legendUrl = getLegendGraphicUrl(layer, 'image/png', !Boolean(layer.get('ArcGIS') == true));
         const iconSpan = visibleLayer.getElementsByClassName('icon')[0];
         if (iconSpan) {
           const iconHtml = `<img class="cover" src="${legendUrl}" style="">`;
@@ -168,7 +178,8 @@ const StyleSetter = function StyleSetter(options = {}) {
 
         const secondarySlideNavImageEl = targetElement.getElementsByTagName('li')[0];
         if (secondarySlideNavImageEl) {
-          secondarySlideNavImageEl.parentElement.innerHTML = secondarySlideHtmlString(isTheme, getLegendGraphicUrl(layer, 'image/png', true));
+          const isThemeEvent = layer.get('ArcGIS') == true ? Boolean(layer.get('print_theme')) : await checkIfTheme(layer);
+          secondarySlideNavImageEl.parentElement.innerHTML = secondarySlideHtmlString(isThemeEvent, getLegendGraphicUrl(layer, 'image/png', !Boolean(layer.get('ArcGIS') == true) && !isThemeEvent));
         }
       });
     });
