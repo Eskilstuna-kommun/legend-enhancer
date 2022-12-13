@@ -1,18 +1,12 @@
 const webpack = require('webpack');
 const { merge } = require('webpack-merge');
-const TerserPlugin = require('terser-webpack-plugin');
 const MiniCssExtractPlugin = require("mini-css-extract-plugin");
 const common = require('./webpack.common.js');
 
 module.exports = merge(common, {
   optimization: {
     nodeEnv: 'production',
-    minimize: true,
-    minimizer: [
-      new TerserPlugin({
-        parallel: true,
-        extractComments: false
-      })]
+    minimize: true
   },
   performance: { hints: false },
   output: {
@@ -31,7 +25,7 @@ module.exports = merge(common, {
         use: [
           {
             loader: MiniCssExtractPlugin.loader
-          },       
+          },
           {
             loader: "css-loader"
           },
@@ -44,18 +38,18 @@ module.exports = merge(common, {
                 })
               ]
             }
-          },                    
+          },
           {
-            loader: "sass-loader"     
-          }       
+            loader: "sass-loader"
+          }
         ]
-      }       
+      }
     ]
   },
   plugins: [
     new webpack.optimize.AggressiveMergingPlugin(),
     new MiniCssExtractPlugin({
-      filename: "../css/le.css"    
-    })    
+      filename: "../css/le.css"
+    })
   ]
 });
