@@ -1,3 +1,6 @@
+# Deprecated
+This plugin has been deprecated. AlterLayerStyle is now a part of Origo, group indication as well, as is styleSetter for WMS layers. For layer abstracts from a csw service see https://github.com/Eskilstuna-kommun/abstractsettercsw .
+
 # legend-enhancer
 legend-enhancer is a legend modifier for Origo, the modifications are  fragment-plugins that the legend-enhancer handles. 
 
